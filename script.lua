@@ -111,10 +111,12 @@ function MacLib:Window(Settings)
 	base.BorderSizePixel = 0
 	base.Position = UDim2.fromScale(0.5, 0.5)
 	base.Size = Settings.Size or UDim2.fromOffset(868, 650)
+	base.Visible = false
 
 	local baseUIScale = Instance.new("UIScale")
 	baseUIScale.Name = "BaseUIScale"
 	baseUIScale.Parent = base
+	baseUIScale.Scale = 0.9
 
 	local baseUICorner = Instance.new("UICorner")
 	baseUICorner.Name = "BaseUICorner"
@@ -1773,6 +1775,12 @@ function MacLib:Window(Settings)
 		return windowState
 	end
 
+	function WindowFunctions:Reveal()
+		base.Visible = true
+		baseUIScale.Scale = 0.9
+		Tween(baseUIScale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	end
+
 	local floatingGui = Instance.new("ScreenGui")
 	floatingGui.Name = "Mk7_FloatingBubble"
 	floatingGui.ResetOnSpawn = false
@@ -1961,7 +1969,206 @@ local MacLib = MacLib
 
 
 -- =====================================================================
--- 2. VOTRE SCRIPT (MK7 HUB)
+-- 2. INTRO ANIMATION
+-- =====================================================================
+local CUSTOM_INTRO_IMAGE = "rbxassetid://125695892332574"
+
+local function PlayIntro(onComplete)
+	local introGui = Instance.new("ScreenGui")
+	introGui.Name = "Mk7_Intro"
+	introGui.ResetOnSpawn = false
+	introGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	introGui.DisplayOrder = 2147483647
+	introGui.IgnoreGuiInset = true
+
+	local okParent = pcall(function()
+		introGui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
+	end)
+	if not okParent then
+		introGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+	end
+
+	local blurEffect = Instance.new("BlurEffect")
+	blurEffect.Name = "Mk7IntroBlur"
+	blurEffect.Size = 0
+	blurEffect.Parent = Lighting
+
+	local bg = Instance.new("Frame")
+	bg.Name = "Background"
+	bg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	bg.BackgroundTransparency = 1
+	bg.BorderSizePixel = 0
+	bg.Size = UDim2.fromScale(1, 1)
+	bg.Parent = introGui
+
+	local container = Instance.new("Frame")
+	container.Name = "Container"
+	container.BackgroundTransparency = 1
+	container.AnchorPoint = Vector2.new(0.5, 0.5)
+	container.Position = UDim2.fromScale(0.5, 0.5)
+	container.Size = UDim2.fromOffset(600, 400)
+	container.Parent = bg
+
+	-- Image personnalisée en rond
+	local avatarCircle = Instance.new("ImageLabel")
+	avatarCircle.Name = "AvatarCircle"
+	avatarCircle.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	avatarCircle.BorderSizePixel = 0
+	avatarCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+	avatarCircle.Position = UDim2.new(0.5, 0, 0, 60)
+	avatarCircle.Size = UDim2.fromOffset(110, 110)
+	avatarCircle.Image = CUSTOM_INTRO_IMAGE
+	avatarCircle.ImageTransparency = 1
+	avatarCircle.BackgroundTransparency = 1
+	avatarCircle.ScaleType = Enum.ScaleType.Crop
+	avatarCircle.Parent = container
+
+	local avatarCorner = Instance.new("UICorner")
+	avatarCorner.CornerRadius = UDim.new(1, 0)
+	avatarCorner.Parent = avatarCircle
+
+	-- Titre avec ombre portée basse
+	local titleText = "Mk7 Aimbot Hub"
+
+	local titleShadow = Instance.new("TextLabel")
+	titleShadow.BackgroundTransparency = 1
+	titleShadow.FontFace = Font.new(assets.interFont, Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+	titleShadow.Text = titleText
+	titleShadow.TextSize = 44
+	titleShadow.TextColor3 = Color3.fromRGB(0, 0, 0)
+	titleShadow.TextTransparency = 1
+	titleShadow.TextStrokeTransparency = 1
+	titleShadow.AnchorPoint = Vector2.new(0.5, 0.5)
+	titleShadow.Position = UDim2.new(0.5, 0, 0, 195)
+	titleShadow.Size = UDim2.new(1, 0, 0, 60)
+	titleShadow.Parent = container
+
+	local title = Instance.new("TextLabel")
+	title.BackgroundTransparency = 1
+	title.FontFace = Font.new(assets.interFont, Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+	title.Text = titleText
+	title.TextSize = 44
+	title.TextColor3 = Color3.fromRGB(255, 255, 255)
+	title.TextTransparency = 1
+	title.TextStrokeTransparency = 1
+	title.AnchorPoint = Vector2.new(0.5, 0.5)
+	title.Position = UDim2.new(0.5, 0, 0, 191)
+	title.Size = UDim2.new(1, 0, 0, 60)
+	title.Parent = container
+
+	local subtitle = Instance.new("TextLabel")
+	subtitle.BackgroundTransparency = 1
+	subtitle.FontFace = Font.new(assets.interFont, Enum.FontWeight.Medium, Enum.FontStyle.Normal)
+	subtitle.Text = "L O A D I N G"
+	subtitle.TextSize = 13
+	subtitle.TextColor3 = Color3.fromRGB(180, 180, 180)
+	subtitle.TextTransparency = 1
+	subtitle.TextStrokeTransparency = 1
+	subtitle.AnchorPoint = Vector2.new(0.5, 0.5)
+	subtitle.Position = UDim2.new(0.5, 0, 0, 235)
+	subtitle.Size = UDim2.new(1, 0, 0, 20)
+	subtitle.Parent = container
+
+	local barBg = Instance.new("Frame")
+	barBg.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	barBg.BorderSizePixel = 0
+	barBg.AnchorPoint = Vector2.new(0.5, 0.5)
+	barBg.Position = UDim2.new(0.5, 0, 0, 275)
+	barBg.Size = UDim2.fromOffset(300, 4)
+	barBg.BackgroundTransparency = 1
+	barBg.Parent = container
+
+	local barBgCorner = Instance.new("UICorner")
+	barBgCorner.CornerRadius = UDim.new(1, 0)
+	barBgCorner.Parent = barBg
+
+	local barFill = Instance.new("Frame")
+	barFill.BackgroundColor3 = Color3.fromRGB(239, 68, 68)
+	barFill.BorderSizePixel = 0
+	barFill.Size = UDim2.fromScale(0, 1)
+	barFill.Parent = barBg
+
+	local barFillCorner = Instance.new("UICorner")
+	barFillCorner.CornerRadius = UDim.new(1, 0)
+	barFillCorner.Parent = barFill
+
+	local barGlow = Instance.new("UIStroke")
+	barGlow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	barGlow.Color = Color3.fromRGB(239, 68, 68)
+	barGlow.Transparency = 1
+	barGlow.Thickness = 2
+	barGlow.Parent = barBg
+
+	local percentText = Instance.new("TextLabel")
+	percentText.BackgroundTransparency = 1
+	percentText.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+	percentText.Text = "0%"
+	percentText.TextSize = 11
+	percentText.TextColor3 = Color3.fromRGB(180, 180, 180)
+	percentText.TextTransparency = 1
+	percentText.TextStrokeTransparency = 1
+	percentText.AnchorPoint = Vector2.new(0.5, 0)
+	percentText.Position = UDim2.new(0.5, 0, 0, 288)
+	percentText.Size = UDim2.new(1, 0, 0, 14)
+	percentText.Parent = container
+
+	task.spawn(function()
+		Tween(blurEffect, TweenInfo.new(0.5, Enum.EasingStyle.Sine), { Size = 24 }):Play()
+		Tween(bg, TweenInfo.new(0.5, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.5 }):Play()
+		task.wait(0.5)
+
+		Tween(avatarCircle, TweenInfo.new(0.5, Enum.EasingStyle.Sine), { ImageTransparency = 0 }):Play()
+		task.wait(0.3)
+
+		Tween(title, TweenInfo.new(0.5, Enum.EasingStyle.Sine), { TextTransparency = 0 }):Play()
+		Tween(titleShadow, TweenInfo.new(0.5, Enum.EasingStyle.Sine), { TextTransparency = 0.4 }):Play()
+		Tween(subtitle, TweenInfo.new(0.5, Enum.EasingStyle.Sine), { TextTransparency = 0 }):Play()
+		task.wait(0.3)
+
+		Tween(barBg, TweenInfo.new(0.3, Enum.EasingStyle.Sine), { BackgroundTransparency = 0 }):Play()
+		Tween(barGlow, TweenInfo.new(0.3, Enum.EasingStyle.Sine), { Transparency = 0.5 }):Play()
+		Tween(percentText, TweenInfo.new(0.3, Enum.EasingStyle.Sine), { TextTransparency = 0 }):Play()
+
+		local totalTime = 2.2
+		local steps = 100
+		local stepTime = totalTime / steps
+
+		for i = 1, steps do
+			barFill.Size = UDim2.fromScale(i / 100, 1)
+			percentText.Text = i .. "%"
+			task.wait(stepTime)
+		end
+
+		task.wait(0.3)
+
+		Tween(blurEffect, TweenInfo.new(0.5, Enum.EasingStyle.Sine), { Size = 0 }):Play()
+		Tween(bg, TweenInfo.new(0.5, Enum.EasingStyle.Sine), { BackgroundTransparency = 1 }):Play()
+		Tween(avatarCircle, TweenInfo.new(0.5, Enum.EasingStyle.Sine), { ImageTransparency = 1 }):Play()
+		Tween(title, TweenInfo.new(0.5, Enum.EasingStyle.Sine), { TextTransparency = 1 }):Play()
+		Tween(titleShadow, TweenInfo.new(0.5, Enum.EasingStyle.Sine), { TextTransparency = 1 }):Play()
+		Tween(subtitle, TweenInfo.new(0.5, Enum.EasingStyle.Sine), { TextTransparency = 1 }):Play()
+		Tween(barBg, TweenInfo.new(0.5, Enum.EasingStyle.Sine), { BackgroundTransparency = 1 }):Play()
+		Tween(barFill, TweenInfo.new(0.5, Enum.EasingStyle.Sine), { BackgroundTransparency = 1 }):Play()
+		Tween(barGlow, TweenInfo.new(0.5, Enum.EasingStyle.Sine), { Transparency = 1 }):Play()
+		Tween(percentText, TweenInfo.new(0.5, Enum.EasingStyle.Sine), { TextTransparency = 1 }):Play()
+
+		task.wait(0.6)
+
+		if blurEffect and blurEffect.Parent then
+			blurEffect:Destroy()
+		end
+
+		introGui:Destroy()
+
+		if onComplete then
+			onComplete()
+		end
+	end)
+end
+
+
+-- =====================================================================
+-- 3. VOTRE SCRIPT (MK7 HUB)
 -- =====================================================================
 
 local Window = MacLib:Window({
@@ -1972,12 +2179,6 @@ local Window = MacLib:Window({
 	ShowUserInfo = true,
 	Keybind = Enum.KeyCode.RightControl,
 	AcrylicBlur = true,
-})
-
-Window:Notify({
-	Title = "Mk7Hub!",
-	Description = "Thx for using my script !!",
-	Lifetime = 5
 })
 
 local tabGroup = Window:TabGroup()
@@ -2365,7 +2566,7 @@ do
 	end)
 end
 
---// Onglet Combat (Aimbot) - AVEC TEAM CHECK ARSENAL
+--// Onglet Combat (Aimbot)
 do
 	local Players = game:GetService("Players")
 	local RunService = game:GetService("RunService")
@@ -2949,7 +3150,7 @@ do
 	end)
 end
 
---// Onglet Visuals (Player ESP) - AVEC COULEUR DYNAMIQUE ENNEMI/ALLIÉ
+--// Onglet Visuals (Player ESP)
 do
 	local Players = game:GetService("Players")
 	local RunService = game:GetService("RunService")
@@ -2961,9 +3162,8 @@ do
 	local ACCENT = Color3.fromRGB(239, 68, 68)
 	local FONT = "rbxasset://fonts/families/GothamSSm.json"
 
-	-- Couleurs fixes
-	local ENEMY_COLOR = Color3.fromRGB(239, 68, 68)  -- Rouge pour les ennemis
-	local ALLY_COLOR = Color3.fromRGB(255, 255, 255)  -- Blanc pour les alliés
+	local ENEMY_COLOR = Color3.fromRGB(239, 68, 68)
+	local ALLY_COLOR = Color3.fromRGB(255, 255, 255)
 
 	local espState = {
 		Enabled = false,
@@ -2975,9 +3175,9 @@ do
 		HeadDot = false,
 		MobileRenderer = false,
 		Size = 1.3,
-		Color = Color3.fromRGB(255, 255, 255), -- Utilisé quand "Use Custom Color" est coché
+		Color = Color3.fromRGB(255, 255, 255),
 		RenderDistance = 250,
-		TeamColor = true, -- NOUVEAU : colorer selon l'équipe (rouge = ennemi, blanc = allié)
+		TeamColor = true,
 	}
 
 	local function Corner(parent, radius)
@@ -3259,9 +3459,6 @@ do
 	local headDotRow = Row(6, "Head Dot", "draw a dot on the player's head", 62, 44)
 	Toggle(headDotRow, false, function(v) espState.HeadDot = v end)
 
-	-- ============================================================
-	-- NOUVEAU : Team Color (rouge = ennemi, blanc = allié)
-	-- ============================================================
 	local teamColorRow = Row(7, "Team Color", "red for enemies, white for allies", 62, 44)
 	Toggle(teamColorRow, true, function(v)
 		espState.TeamColor = v
@@ -3400,18 +3597,15 @@ do
 		if drawings.HeadDot then drawings.HeadDot.Visible = false end
 	end
 
-	-- Fonction pour déterminer la couleur selon l'ennemi/allié
 	local function GetPlayerColor(player)
 		if not espState.TeamColor then
 			return espState.Color
 		end
-
 		local myTeam = LocalPlayer.Team
 		local myTeamColor = LocalPlayer.TeamColor
 		local theirTeam = player.Team
 		local theirTeamColor = player.TeamColor
 
-		-- Vérification par Team
 		if myTeam and theirTeam then
 			if theirTeam == myTeam then
 				return ALLY_COLOR
@@ -3419,8 +3613,6 @@ do
 				return ENEMY_COLOR
 			end
 		end
-
-		-- Vérification par TeamColor
 		if myTeamColor and theirTeamColor then
 			if theirTeamColor == myTeamColor then
 				return ALLY_COLOR
@@ -3428,8 +3620,6 @@ do
 				return ENEMY_COLOR
 			end
 		end
-
-		-- Aucune team définie : rouge par défaut
 		return ENEMY_COLOR
 	end
 
@@ -3486,7 +3676,6 @@ do
 						local x = math.floor(centerX - width / 2)
 						local y = math.floor(centerY - height / 2)
 
-						-- Couleur dynamique : rouge pour ennemis, blanc pour alliés
 						local color = GetPlayerColor(player)
 
 						if espState.BoxStyle == "Box" then
@@ -3574,3 +3763,7 @@ end
 
 --// Lancement
 tabs.Home:Select()
+
+PlayIntro(function()
+	Window:Reveal()
+end)
