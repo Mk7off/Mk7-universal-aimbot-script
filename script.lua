@@ -707,8 +707,7 @@ function MacLib:Window(Settings)
 	currentTab.TextColor3 = Color3.fromRGB(255, 255, 255)
 	currentTab.TextSize = 15
 	currentTab.TextTransparency = 0.5
-	currentTab.TextTruncate = Enum.TextTruncate.SplitWord
-	currentTab.TextXAlignment = Enum.TextXAlignment.Left
+	currentTab.TextTruncate = Enum.TextTruncate.SplitWord	currentTab.TextXAlignment = Enum.TextXAlignment.Left
 	currentTab.TextYAlignment = Enum.TextYAlignment.Top
 	currentTab.AnchorPoint = Vector2.new(0, 0.5)
 	currentTab.AutomaticSize = Enum.AutomaticSize.Y
@@ -2009,7 +2008,6 @@ local function PlayIntro(onComplete)
 	container.Size = UDim2.fromOffset(600, 400)
 	container.Parent = bg
 
-	-- Image personnalisée en rond
 	local avatarCircle = Instance.new("ImageLabel")
 	avatarCircle.Name = "AvatarCircle"
 	avatarCircle.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -2027,7 +2025,6 @@ local function PlayIntro(onComplete)
 	avatarCorner.CornerRadius = UDim.new(1, 0)
 	avatarCorner.Parent = avatarCircle
 
-	-- Titre avec ombre portée basse
 	local titleText = "Mk7 Aimbot Hub"
 
 	local titleShadow = Instance.new("TextLabel")
@@ -2566,12 +2563,13 @@ do
 	end)
 end
 
---// Onglet Combat (Aimbot)
+--// Onglet Combat (Aimbot + Triggerbot FULL AUTO + Wallbang + Auto Aim)
 do
 	local Players = game:GetService("Players")
 	local RunService = game:GetService("RunService")
 	local UserInputService = game:GetService("UserInputService")
 	local TweenService = game:GetService("TweenService")
+	local VirtualInputManager = game:GetService("VirtualInputManager")
 	local LocalPlayer = Players.LocalPlayer
 	local Camera = workspace.CurrentCamera
 
@@ -2588,8 +2586,14 @@ do
 		FOV = 120,
 		Key = { Mouse = Enum.UserInputType.MouseButton2 },
 		TeamCheck = false,
+		Triggerbot = false,
+		TriggerDelay = 50,
+		TriggerKey = "Auto",
+		Wallbang = false,
+		AutoAim = false,
 	}
 	local held, toggled, listening = false, false, false
+	local lastTriggerTime = 0
 
 	local function Corner(parent, radius)
 		local c = Instance.new("UICorner")
@@ -2950,18 +2954,73 @@ do
 		end
 	end)
 
-	local teamRow = Row(6, "Team Check (Arsenal)", "if enabled, only aims at enemies (ignores teammates)", 62, 44)
+	local teamRow = Row(6, "Team Check", "if enabled, only aims at enemies (ignores teammates)", 62, 44)
 	Toggle(teamRow, false, function(v)
 		state.TeamCheck = v
 	end)
 
-	Slider(7, "Cursor Speed", "how far the cursor may travel in one frame", 1, 500, state.Speed, "px", function(v)
+	-- ⭐ AUTO AIM : vise tout seul sans touche
+	local autoAimRow = Row(7, "Auto Aim", "aims automatically when a VISIBLE enemy is in the FOV (no key needed)", 62, 44)
+	Toggle(autoAimRow, false, function(v)
+		state.AutoAim = v
+	end)
+
+	-- ⭐ WALLBANG
+	local wallbangRow = Row(8, "Wallbang", "target enemies through walls (client-side; damage depends on the game)", 62, 44)
+	Toggle(wallbangRow, false, function(v)
+		state.Wallbang = v
+	end)
+
+	Slider(9, "Cursor Speed", "how far the cursor may travel in one frame", 1, 500, state.Speed, "px", function(v)
 		state.Speed = v
 	end)
 
-	Slider(8, "FOV", "radius of the circle that picks targets", 10, 600, state.FOV, "", function(v)
+	Slider(10, "FOV", "radius of the circle that picks targets", 10, 600, state.FOV, "", function(v)
 		state.FOV = v
 		UpdatePreview()
+	end)
+
+	Label(left, '<font color="#ef4444">●</font>  TRIGGERBOT', 11, Enum.FontWeight.SemiBold, 0.4,
+		UDim2.new(), UDim2.new(1, 0, 0, 18)).LayoutOrder = 11
+
+	local triggerHeld = false
+
+	local function ReleaseTrigger()
+		if triggerHeld then
+			if mouse1release then
+				pcall(function() mouse1release() end)
+			elseif keyrelease then
+				pcall(function() keyrelease(0x01) end)
+			end
+			triggerHeld = false
+		end
+	end
+
+	local function PressTrigger()
+		if not triggerHeld then
+			if mouse1press then
+				pcall(function() mouse1press() end)
+				triggerHeld = true
+			elseif keypress then
+				pcall(function() keypress(0x01) end)
+				triggerHeld = true
+			end
+		end
+	end
+
+	local triggerbotRow = Row(12, "Triggerbot", "fully automatic: aims AND shoots when an enemy is in the FOV", 62, 44)
+	Toggle(triggerbotRow, false, function(v)
+		state.Triggerbot = v
+		if not v then ReleaseTrigger() end
+	end)
+
+	local triggerKeyRow = Row(13, "Trigger Mode", "Auto works without any key. Key requires aim key", 62, 192)
+	Segmented(triggerKeyRow, { "Auto", "Key" }, state.TriggerKey, function(v)
+		state.TriggerKey = v
+	end)
+
+	Slider(14, "Trigger Delay", "min wait time between shots (in milliseconds)", 0, 500, state.TriggerDelay, "ms", function(v)
+		state.TriggerDelay = v
 	end)
 
 	UpdatePreview()
@@ -3080,6 +3139,83 @@ do
 		return best
 	end
 
+	-- ============================================================
+	-- VÉRIFICATION DE VISIBILITÉ
+	-- ============================================================
+	local function IsVisible(part)
+		if state.Wallbang then
+			return true
+		end
+
+		if not part then return false end
+
+		local char = LocalPlayer.Character
+		local startPart = char and (char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart"))
+		local origin = startPart and startPart.Position or Camera.CFrame.Position
+
+		local direction = (part.Position - origin)
+		local distance = direction.Magnitude
+		if distance < 1 then return true end
+		direction = direction.Unit
+
+		local raycastParams = RaycastParams.new()
+		raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+		local excludeList = { Camera }
+		if char then table.insert(excludeList, char) end
+		raycastParams.FilterDescendantsInstances = excludeList
+		raycastParams.IgnoreWater = true
+
+		local result = workspace:Raycast(origin, direction * distance, raycastParams)
+
+		if not result then return true end
+		if result.Instance == part then return true end
+
+		local hitChar = result.Instance:FindFirstAncestorOfClass("Model")
+		local targetChar = part:FindFirstAncestorOfClass("Model")
+		if hitChar and targetChar and hitChar == targetChar then
+			return true
+		end
+		return false
+	end
+
+	local function GetValidTarget(mouse)
+		local target = GetClosest(mouse)
+		if not target then return nil end
+		if not IsVisible(target.part) then return nil end
+		return target
+	end
+
+	local function TryTriggerbot()
+		if not state.Triggerbot then
+			ReleaseTrigger()
+			return
+		end
+
+		if state.TriggerKey == "Key" and not IsActive() then
+			ReleaseTrigger()
+			return
+		end
+
+		local now = tick() * 1000
+		local mouse = UserInputService:GetMouseLocation()
+		local target = GetValidTarget(mouse)
+
+		if not target then
+			ReleaseTrigger()
+			lastTriggerTime = now
+			return
+		end
+
+		if now - lastTriggerTime < state.TriggerDelay then
+			return
+		end
+
+		if not triggerHeld then
+			lastTriggerTime = now
+			PressTrigger()
+		end
+	end
+
 	local function KeyHint()
 		if state.KeyMode == "Always" then return "always active" end
 		local verb = state.KeyMode == "Hold" and "hold " or "press "
@@ -3097,6 +3233,7 @@ do
 	RunService:BindToRenderStep("Mk7Aimbot", Enum.RenderPriority.Camera.Value + 1, function()
 		if not Window.ScreenGui or not Window.ScreenGui.Parent then
 			RunService:UnbindFromRenderStep("Mk7Aimbot")
+			ReleaseTrigger()
 			fovGui:Destroy()
 			return
 		end
@@ -3105,48 +3242,57 @@ do
 		if not Camera then return end
 
 		local mouse = UserInputService:GetMouseLocation()
-		fovRing.Visible = state.Enabled
+		fovRing.Visible = state.Enabled or state.Triggerbot or state.AutoAim
 		fovRing.Size = UDim2.fromOffset(state.FOV * 2, state.FOV * 2)
 		fovRing.Position = UDim2.fromOffset(mouse.X, mouse.Y)
 
-		if not state.Enabled then
-			SetStatus("Aimbot is off", "aimbot off")
-			return
-		end
+		-- Auto Aim manuel OU Triggerbot (vise + tire tout seul)
+		local autoAim = state.Triggerbot or state.AutoAim
+		local shouldAim = IsActive() or autoAim
 
-		if not IsActive() then
-			SetStatus("Aimbot is on · " .. KeyHint(), "aimbot on")
-			return
-		end
+		if (state.Enabled or state.Triggerbot or state.AutoAim) and shouldAim then
+			local target = GetValidTarget(mouse)
 
-		local target = GetClosest(mouse)
-		if not target then
-			SetStatus("Aimbot is on · no target in FOV", "no target")
-			return
-		end
-		SetStatus("Locked on " .. target.player.DisplayName, "locked: " .. target.player.Name)
+			if target then
+				local delta = target.screen - mouse
+				local dist = delta.Magnitude
 
-		local delta = target.screen - mouse
-		local dist = delta.Magnitude
+				local mode = state.AimMode
+				if mode == "Auto" then
+					mode = (UserInputService.MouseBehavior ~= Enum.MouseBehavior.Default) and "Camera" or "FreeAim"
+				end
+				if mode == "FreeAim" and not mousemoverel then
+					mode = "Camera"
+				end
 
-		local mode = state.AimMode
-		if mode == "Auto" then
-			mode = (UserInputService.MouseBehavior ~= Enum.MouseBehavior.Default) and "Camera" or "FreeAim"
-		end
-		if mode == "FreeAim" and not mousemoverel then
-			mode = "Camera"
-		end
+				if mode == "FreeAim" then
+					if dist > state.Speed then
+						delta = delta.Unit * state.Speed
+					end
+					mousemoverel(delta.X, delta.Y)
+				else
+					local alpha = dist > 0 and math.min(1, state.Speed / dist) or 0
+					local goal = CFrame.lookAt(Camera.CFrame.Position, target.part.Position)
+					Camera.CFrame = Camera.CFrame:Lerp(goal, alpha)
+				end
 
-		if mode == "FreeAim" then
-			if dist > state.Speed then
-				delta = delta.Unit * state.Speed
+				SetStatus("Locked on " .. target.player.DisplayName, "locked: " .. target.player.Name)
+			else
+				if state.AutoAim and state.Enabled then
+					SetStatus("Auto Aim active · no visible target", "no target")
+				elseif state.Enabled then
+					SetStatus("Aimbot is on · no target", "no target")
+				elseif state.Triggerbot then
+					SetStatus("Triggerbot active · searching...", "searching")
+				end
 			end
-			mousemoverel(delta.X, delta.Y)
-		else
-			local alpha = dist > 0 and math.min(1, state.Speed / dist) or 0
-			local goal = CFrame.lookAt(Camera.CFrame.Position, target.part.Position)
-			Camera.CFrame = Camera.CFrame:Lerp(goal, alpha)
+		elseif not state.Enabled and not state.Triggerbot and not state.AutoAim then
+			SetStatus("Aimbot is off", "aimbot off")
+		elseif not IsActive() and not autoAim then
+			SetStatus("Aimbot is on · " .. KeyHint(), "aimbot on")
 		end
+
+		TryTriggerbot()
 	end)
 end
 
